@@ -1,0 +1,124 @@
+manual 
+
+데이터 위치 
+
+https://www.ncbi.nlm.nih.gov/sra/ERX2354982[accn]
+ERR2303646	
+https://www.ncbi.nlm.nih.gov/sra/ERX2354983[accn]
+ERR2303647	
+https://www.ncbi.nlm.nih.gov/sra/ERX2354981[accn]
+ERR2303645
+
+
+gtf 데이터 다운 
+ucsc - tools - table browser 
+입력값- assembly : hg38
+table: knownGene 
+output format: GTF 
+output file: hg19.gtf 
+
+tophat 은 파이썬2에서 밖에 작동하지 않는다. 
+conda create --name RNA python=2.7 
+source activate RNA
+
+#tophat install 
+sudo apt install tophat 
+conda install samtools 
+conda install cufflinks 
+conda install htseq 
+conda install bwa 
+
+## how to use ref : http://lh3.github.io/2017/11/13/which-human-reference-genome-to-use
+## ucsc ref: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/
+## embl refdata: http://ftp.ensembl.org/pub/current_fasta/homo_sapiens/dna/
+
+TrueSeq Standard Total RNA Library Prep Kit and paired-end sequencing was performed to gain an average output of 50-100M reads.
+
+our data is from nextseq 500 
+Untrimmed reads
+Reads trimmed by Trimmomatic
+Organized into paired reads and reads whose pair was not retained due to quality trimming
+In addition to trimming Illumina adapter sequence, trimmomatic parameters used are: LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15
+Fastqc_out folder containing zipped quality reports
+
+ref: https://uagc.arl.arizona.edu/illumina-nextseq-500
+
+
+pipeline 
+
+download ERR data 
+fastq-dump or wget for complete fastq file 
+fastq-dump --split-files ERR2303646
+
+fastqc -t 2 -o 01_RNA/01_fastqc 00_rawdata/00_RNA/ERR2303646_1.fastq.gz
+fastqc -t 2 -o 01_RNA/01_fastqc 00_rawdata/00_RNA/ERR2303646_2.fastq.gz
+
+indexing 
+ref: http://www.metagenomics.wiki/tools/bowtie2/index
+bowtie2-build hg38.fa hg38
+
+
+trimmomatic 
+
+trimmomatic PE /home/00_TeamProject/00_raw_data/00_RNA/ERR2303646_1.fastq.gz /home/00_TeamProject/00_raw_data/00_RNA/ERR2303646_2.fastq.gz \                                                         
+/home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_1.P.fastq.gz /home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_1.U.fastq.gz \                                                                        
+/home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_2.P.fastq.gz /home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_2.U.fastq.gz \                                                                        
+ILLUMINACLIP:/home/shinjae325/.conda/pkgs/trimmomatic-0.38-1/share/trimmomatic-0.38-1/adapters/TruSeq3-PE-2.fa:2:30:10 \ 
+
+tophat 
+
+tophat \                                                                                                                                                                                             
+        --output-dir 02_Align/trimmed \                                                                                                                                                              
+        --num-threads 8 \                                                                                                                                                                            
+        --mate-inner-dist 250 --mate-std-dev 50 \
+        --library-type fr-unstranded \
+        --GTF /home/00_TeamProject/resources/hg38.gtf \
+        --rg-id rna \
+        --rg-sample rna_tumor \
+        /home/00_TeamProject/resources/rna/hg38.fa \
+        /home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_1.P.fastq.gz \
+        /home/00_TeamProject/01_RNA/01-2_Trim/ERR2303646_2.P.fastq.gz
+
+
+==> result 
+cat align_summary.txt 
+94.0% concordant pair alignment rate. 
+
+cufflinks 
+
+ready for mask.gtf 
+mitocondiral region 
+table: knownGene 
+position: chrM 
+output format: gtf 
+output file: hg38.mask.mito.gtf 
+
+rRNA 
+group: All tables 
+table: rmsk 
+output format: gtf 
+output file: hg38_mask_rRNA.gtf 
+
+== combine ==> hg38.masked.gtf 
+
+tophat \
+--output-dir 02.RNA_Align/ \
+--num-threads 8 \
+--mate-iner-dist 250 --mate-std-dev 50 \
+--library-type fr-unstranded \
+--GTF 
+--rg-id rna 
+--rg-sample expression
+
+
+#!/bin/bash
+
+cufflinks \
+        --output-dir 03_Cufflinks/trimmed \
+        --num-threads 8 \
+        --library-type fr-unstranded \
+        --GTF-guide /home/00_TeamProject/resources/hg38.gtf \
+        --mask-file /home/00_TeamProject/resources/hg38.masked.gtf \
+        --multi-read-correct \
+        --frag-bias-correct /home/00_TeamProject/resources/rna/hg38.fa \
+        02_Align/trimmed/accepted_hits.bam
