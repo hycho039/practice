@@ -1,4 +1,9 @@
 ''' 
+
+This script for email automation who wants to collect each department's next week's work. 
+The script runs from Wednseday to Friday. And, I set the Window scheduler to execute this file when I turn on my computer.
+Naver email has been used, and it's just scratch script for work. Not a complete script.
+
 scheduler + sending mail  
 trial1 
 writer: Hyein Cho  
